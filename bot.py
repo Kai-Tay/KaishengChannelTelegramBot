@@ -13,17 +13,33 @@ logging.basicConfig(
     level=logging.INFO
 )
 
+def get_days_since_drunk():
+    daysSinceDrunk = 0
+    if not os.path.exists('daysSinceDrunk.txt'):
+        with open('daysSinceDrunk.txt', 'w') as file:
+            file.write(str(0))
+    else:
+        with open('daysSinceDrunk.txt', 'r') as file:
+            daysSinceDrunk = int(file.read())
+    return daysSinceDrunk
+
 async def send_scheduled_message(context: CallbackContext):
     global daysSinceDrunk
-    channel_username = '-1002157531667'  
-    message = f"Good Morning Everyone! I am sober for {daysSinceDrunk} days! Cheers to that! 🍻 "
-    await context.bot.send_message(chat_id=channel_username, text=message)
+     # Update the daysSinceDrunk.txt file
+    with open('daysSinceDrunk.txt', 'w') as file:
+        file.write(str(daysSinceDrunk))
+
+    # Increment the daysSinceDrunk
     daysSinceDrunk += 1
 
-async def send_drunk_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Send the message to the channel
     channel_username = '-1002157531667'  
     message = f"Good Morning Everyone! I am sober for {daysSinceDrunk} days! Cheers to that! 🍻 "
     await context.bot.send_message(chat_id=channel_username, text=message)
+
+async def send_drunk_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message = f"Good Morning Everyone! I am sober for {daysSinceDrunk} days! Cheers to that! 🍻 "
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=message)
     
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=update.effective_chat.id, text="Bot is running! Amen 😇")
@@ -32,12 +48,16 @@ async def drunk(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global daysSinceDrunk
     if update.effective_chat.id == 716853175:
         await context.bot.send_message(chat_id=update.effective_chat.id, text="You are drunk 🍾 Resetting back to 0 days...")
+        with open('daysSinceDrunk.txt', 'w') as file:
+            file.write(str(0))
         daysSinceDrunk = 0
     else:
         await context.bot.send_message(chat_id=update.effective_chat.id, text="You are not Kai Sheng.. wya doing here.... 😡")
 
 def main():
-    
+    global daysSinceDrunk
+    daysSinceDrunk = get_days_since_drunk()
+
     application = ApplicationBuilder().token(BOT_TOKEN).build()
     
     start_handler = CommandHandler('start', start)
