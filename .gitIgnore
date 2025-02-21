@@ -1,2 +1,4 @@
 .env
 daysSinceDrunk.txt
+requirements.txt
+Dockerfile

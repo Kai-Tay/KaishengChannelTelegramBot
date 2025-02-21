@@ -31,6 +31,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
+# Helper functions
 def get_days_since_drunk():
     daysSinceDrunk = 0
     if not os.path.exists('daysSinceDrunk.txt'):
@@ -41,7 +42,7 @@ def get_days_since_drunk():
             daysSinceDrunk = int(file.read())
     return daysSinceDrunk
 
-async def get_qotd(context: CallbackContext):
+async def get_qotd():
     response = sqs.receive_message(
         QueueUrl=SQS_QUEUE_URL,
         MaxNumberOfMessages=1,
@@ -57,9 +58,10 @@ async def get_qotd(context: CallbackContext):
             ReceiptHandle=message['ReceiptHandle']
         )
         return quote, user
-    return None
+    return "No quote sent today 🥹, send one to me with /qotd (message)!", "KaishengDrunkSohaiBot"
     
-    
+
+# Scheduled message
 async def send_scheduled_message(context: CallbackContext):
     global daysSinceDrunk
      # Update the daysSinceDrunk.txt file
@@ -69,13 +71,17 @@ async def send_scheduled_message(context: CallbackContext):
     # Increment the daysSinceDrunk
     daysSinceDrunk += 1
 
+    # Get the quote of the day
+    qotd, user   = await get_qotd()
+
     # Send the message to the channel
     channel_username = '-1002157531667'  
-    message = f"Good Morning Everyone! I am sober for {daysSinceDrunk} days! Cheers to that! 🍻 "
+    message = f"Good Morning Everyone! I am sober for {daysSinceDrunk} days! Cheers to that! 🍻 \n\n{qotd} - {user}"
     await context.bot.send_message(chat_id=channel_username, text=message)
 
+# Commands
 async def send_drunk_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    qotd, user   = await get_qotd(context)
+    qotd, user   = await get_qotd()
     message = f"Good Morning Everyone! I am sober for {daysSinceDrunk} days! Cheers to that! 🍻 \n\n{qotd} - {user}"
     await context.bot.send_message(chat_id=update.effective_chat.id, text=message)
     
@@ -152,13 +158,13 @@ def main():
     application.add_handler(send_drunk_message_handler)
 
     # Schedule the job to run at a specific time
-    application.job_queue.run_daily(send_scheduled_message, time=datetime.time(hour=10, minute=10, tzinfo=datetime.timezone(offset=datetime.timedelta(hours=8))))
+    application.job_queue.run_daily(send_scheduled_message, time=datetime.time(hour=10, minute=0, tzinfo=datetime.timezone(offset=datetime.timedelta(hours=8))))
 
     # Add the qotd handler
     qotd_handler = CommandHandler('qotd', qotd)
     application.add_handler(qotd_handler)
 
-    application.run_polling(poll_interval=10.0)
+    application.run_polling(poll_interval=5.0)
 
 if __name__ == '__main__':
     main()
