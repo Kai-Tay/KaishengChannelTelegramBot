@@ -64,12 +64,6 @@ async def get_qotd():
 # Scheduled message
 async def send_scheduled_message(context: CallbackContext):
     global daysSinceDrunk
-     # Update the daysSinceDrunk.txt file
-    with open('daysSinceDrunk.txt', 'w') as file:
-        file.write(str(daysSinceDrunk))
-
-    # Increment the daysSinceDrunk
-    daysSinceDrunk += 1
 
     # Get the quote of the day
     qotd, user   = await get_qotd()
@@ -78,6 +72,13 @@ async def send_scheduled_message(context: CallbackContext):
     channel_username = '-1002157531667'  
     message = f"Good Morning Everyone! I am sober for {daysSinceDrunk} days! Cheers to that! 🍻 \n\n{qotd} - {user}"
     await context.bot.send_message(chat_id=channel_username, text=message)
+
+    # Update the daysSinceDrunk.txt file
+    with open('daysSinceDrunk.txt', 'w') as file:
+        file.write(str(daysSinceDrunk))
+
+    # Increment the daysSinceDrunk
+    daysSinceDrunk += 1
 
 # Commands
 async def send_drunk_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
