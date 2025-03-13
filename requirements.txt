@@ -3,3 +3,4 @@ python-telegram-bot[job-queue]==20.3
 datetime
 boto3
 python-dotenv
+nltk
