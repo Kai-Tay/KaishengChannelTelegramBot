@@ -194,6 +194,13 @@ async def thoughts(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text="Sorry, there was an error reading your thoughts 😭. Please try again later."
         )
 
+async def set(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # set the daysSinceDrunk to the number provided
+    daysSinceDrunk = int(context.args[0])
+    with open('daysSinceDrunk.txt', 'w') as file:
+        file.write(str(daysSinceDrunk))
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=f"Days since drunk set to {daysSinceDrunk}! 🍻")
+
 def main():
     global daysSinceDrunk
     daysSinceDrunk = get_info()
@@ -202,6 +209,9 @@ def main():
     
     start_handler = CommandHandler('start', start)
     application.add_handler(start_handler)  
+
+    set_handler = CommandHandler('set', set)
+    application.add_handler(set_handler)
 
     drunk_handler = CommandHandler('drunk', drunk)
     application.add_handler(drunk_handler)
