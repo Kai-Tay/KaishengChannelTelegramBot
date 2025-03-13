@@ -4,3 +4,4 @@ datetime
 boto3
 python-dotenv
 nltk
+requests
