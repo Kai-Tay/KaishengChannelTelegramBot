@@ -1,14 +1,16 @@
 import datetime
 import logging
 from telegram import Update
-from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackContext
+from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, CallbackContext, MessageHandler, filters
 import os
 import boto3
 import json
 from dotenv import load_dotenv
 import requests
-import nltk
-from nltk.sentiment.vader import SentimentIntensityAnalyzer
+from google import genai
+from google.genai import types
+
+import os
 
 # Load environment variables
 load_dotenv()
@@ -30,14 +32,11 @@ sqs = boto3.client(
     aws_secret_access_key=AWS_SECRET_KEY,
 )
 
-# Initialize VADER sentiment analyzer
-nltk.download('vader_lexicon')
-sid = SentimentIntensityAnalyzer()
-
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
+
 
 # Helper functions
 def get_info():
@@ -69,7 +68,7 @@ async def get_qotd():
         return quote, user
     else:
         # Retrieve the quote from api
-        response = requests.get('https://api.quotable.io/quotes/random?tags=motivational%7Csuccess')
+        response = requests.get('https://api.quotable.io/quotes/random?tags=motivational%7Csuccess',verify=False)
         body = response.json()[0]
         user = body['author']
         quote = body['content']
@@ -85,7 +84,7 @@ async def send_scheduled_message(context: CallbackContext):
 
     # Send the message to the channel
     channel_username = '-1002157531667'  
-    message = f"Good Morning Everyone! I am sober for {daysSinceDrunk} days! Cheers to that! 🍻 \n\n{qotd} - {user} \n\n Also I've added a new feature to the bot! You can now send me your thoughts (/thoughts) and watch what it replies with! 💭"
+    message = f"Good Morning Everyone! I am sober for {daysSinceDrunk} days! Cheers to that! 🍻 \n\n{qotd} - {user}"
     await context.bot.send_message(chat_id=channel_username, text=message)
 
     # Update the daysSinceDrunk.txt file
@@ -158,42 +157,6 @@ async def qotd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text="Sorry, there was an error saving your quote. Please try again later."
         )
 
-async def thoughts(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Please provide a thoughts after the command. Example: /thoughts Your thoughts here"
-        )
-        return
-
-    thoughts = ' '.join(context.args)
-
-    # Use VADER to get the sentiment of the thoughts
-    sentiment = sid.polarity_scores(thoughts)
-    if sentiment['compound'] > 0.5:
-        # Give a positive message
-        sentiment_message = "You're doing great! Keep pushing forward and know that I'm always here hehe! 🔥"
-    elif sentiment['compound'] < -0.5:
-        # Give a encouragement message
-        sentiment_message = "HELLOOO Just wanted to remind you that no matter how tough things may seem right now, you’ve got the strength and resilience to push through it (and you've done it before!). Keep believing in yourselves, and don’t forget to celebrate the small victories along the way. JIAYOUS! You’ve got this! "
-    else:
-        # Give a neutral message
-        sentiment_message = "I'm not sure what you're feeling..., but can always drop me a text if you wanna talk.\n\n Keep pushing forward, and know that I'm always here to support you hehe. 🤓 💪"
-
-
-    try:
-        ## Reply to the user
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=f"{sentiment_message}"
-        )
-    except Exception as e:
-        logging.error(f"Error sending message to user: {str(e)}")
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Sorry, there was an error reading your thoughts 😭. Please try again later."
-        )
-
 async def set(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # set the daysSinceDrunk to the number provided
     daysSinceDrunk = int(context.args[0])
@@ -201,12 +164,132 @@ async def set(update: Update, context: ContextTypes.DEFAULT_TYPE):
         file.write(str(daysSinceDrunk))
     await context.bot.send_message(chat_id=update.effective_chat.id, text=f"Days since drunk set to {daysSinceDrunk}! 🍻")
 
+# Tools
+def get_events():
+    # Call Google Calendar API to get all events
+    # Return the events
+    return "Events"
+
+def add_event(date: str, time: str, description: str):
+    # Call Google Calendar API to add an event
+    # Return the event
+    return "Event added"
+
+def remove_event(event_id: str):
+    # Call Google Calendar API to remove an event
+    # Return the event
+    return "Event removed"
+
+def reschedule_event(event_id: str, new_date: str, new_time: str):
+    # Call Google Calendar API to reschedule an event
+    # Return the event
+    return "Event rescheduled"
+
+# Initialize Gemini
+gemini = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+
+# Define function schemas for Gemini tools
+function_declarations = [
+    {
+        "name": "add_event",
+        "description": "Add a new event to the calendar",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string",
+                    "description": "The date of the event (YYYY-MM-DD format)"
+                },
+                "time": {
+                    "type": "string", 
+                    "description": "The time of the event (HH:MM format)"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Description of the event"
+                }
+            },
+            "required": ["date", "time", "description"]
+        }
+    },
+    {
+        "name": "remove_event",
+        "description": "Remove an event from the calendar",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "event_id": {
+                    "type": "string",
+                    "description": "The ID of the event to remove"
+                }
+            },
+            "required": ["event_id"]
+        }
+    },
+    {
+        "name": "reschedule_event",
+        "description": "Reschedule an existing event",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "event_id": {
+                    "type": "string",
+                    "description": "The ID of the event to reschedule"
+                },
+                "new_date": {
+                    "type": "string",
+                    "description": "The new date for the event (YYYY-MM-DD format)"
+                },
+                "new_time": {
+                    "type": "string",
+                    "description": "The new time for the event (HH:MM format)"
+                }
+            },
+            "required": ["event_id", "new_date", "new_time"]
+        }
+    }
+]
+
+tools = types.Tool(function_declarations=function_declarations)
+config = types.GenerateContentConfig(tools=[tools])
+
+async def schedule_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.id == 716853175:
+        user_message = update.message.text
+        context.user_data.setdefault('history', []).append({"role": "user", "content": user_message})
+
+        instructions = """
+                        You are a helpful calendar scheduler. You are given a event date and you need to check if the date is available. 
+                        Use the tools to call Google Calendar API to check if the date is available on my calendar. 
+                        
+                        If it is, help me schedule the event.
+                        If it is not, you need to tell me that the date is not available, and if I would like to schedule it on a different date or change the current date.
+                        If I am rescheduling the event, you need to ask me for the new date and time.
+
+                        You will be given a list of events that are already scheduled.
+                    """
+        response = gemini.models.generate_content(
+                system_instruction=instructions,
+                model="gemini-2.0-flash",
+                contents=context.user_data['history'],
+                config=config
+            )
+        
+        assistant = response.text
+        context.user_data['history'].append({"role": "assistant", "content": assistant})
+        await update.message.reply_text(assistant)
+    else:
+        await context.bot.send_message(chat_id=update.effective_chat.id, text="You are not Kai Sheng.. wya doing here.... 😡")
+
+
+
 def main():
     global daysSinceDrunk
     daysSinceDrunk = get_info()
 
     application = ApplicationBuilder().token(BOT_TOKEN).build()
     
+    # Command handlers
     start_handler = CommandHandler('start', start)
     application.add_handler(start_handler)  
 
@@ -219,16 +302,15 @@ def main():
     send_drunk_message_handler = CommandHandler('sendDrunk', send_drunk_message)
     application.add_handler(send_drunk_message_handler)
 
-    # Schedule the job to run at a specific time
-    application.job_queue.run_daily(send_scheduled_message, time=datetime.time(hour=10, minute=0, tzinfo=datetime.timezone(offset=datetime.timedelta(hours=8))))
-
-    # Add the qotd handler
     qotd_handler = CommandHandler('qotd', qotd)
     application.add_handler(qotd_handler)
 
-    # Add the thoughts handler
-    thoughts_handler = CommandHandler('thoughts', thoughts)
-    application.add_handler(thoughts_handler)
+    # Message handlers
+    schedule_handler = MessageHandler(filters.TEXT & ~filters.COMMAND, schedule_event)
+    application.add_handler(schedule_handler)
+
+    # Schedule the job to run at a specific time
+    application.job_queue.run_daily(send_scheduled_message, time=datetime.time(hour=10, minute=0, tzinfo=datetime.timezone(offset=datetime.timedelta(hours=8))))
 
     application.run_polling(poll_interval=5.0)
 

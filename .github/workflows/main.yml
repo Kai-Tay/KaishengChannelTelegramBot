@@ -1,0 +1,33 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Copy files to EC2
+        run: |
+          rsync -avz --exclude '.git*' --exclude '.github*' --exclude '.qodo*' ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/${{ secrets.EC2_USER }}/kaishengtelebot
+
+      - name: Upload .env file
+        run: |
+          echo "${{ secrets.ENV_FILE }}" | ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "cat > /home/${{ secrets.EC2_USER }}/kaishengtelebot/.env"
+
+      - name: Restart bot
+        run: |
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "cd /home/${{ secrets.EC2_USER }}/kaishengtelebot && docker-compose down && docker system prune -f && docker-compose build --no-cache && docker-compose up -d && docker image prune -f"
