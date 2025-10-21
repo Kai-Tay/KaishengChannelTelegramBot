@@ -7,7 +7,7 @@ import boto3
 import json
 from dotenv import load_dotenv
 import requests
-
+import random
 import os
 
 # Load environment variables
@@ -65,11 +65,17 @@ async def get_qotd():
         )
         return quote, user
     else:
-        # Retrieve the quote from api
-        response = requests.get('https://api.quotable.io/quotes/random?tags=motivational%7Csuccess',verify=False)
-        body = response.json()[0]
-        user = body['author']
-        quote = body['content']
+        # # Retrieve the quote from api
+        # response = requests.get('https://api.quotable.io/quotes/random?tags=motivational%7Csuccess',verify=False)
+        # body = response.json()[0]
+        # user = body['author']
+        # quote = body['content']
+        # RANDOMLY CHOOSE FROM lany.txt
+        with open('lany.txt', 'r') as file:
+            lines = file.readlines()
+        quote = random.choice(lines)
+        user = 'LANY'
+
         return quote, user
     
 
