@@ -181,7 +181,7 @@ async def set(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     global daysSinceDrunk
     global europeCountdown
-    daysSinceDrunk, europeCountdown = get_info()
+    daysSinceDrunk = get_info()
 
     application = ApplicationBuilder().token(BOT_TOKEN).build()
     
