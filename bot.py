@@ -14,7 +14,7 @@ import os
 load_dotenv()
 
 daysSinceDrunk = 0
-longestStreak = 0
+europeCountdown = 0
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 # Add AWS configuration with debugging
@@ -39,14 +39,21 @@ logging.basicConfig(
 # Helper functions
 def get_info():
     daysSinceDrunk = 0
-    longestStreak = 0
     if not os.path.exists('daysSinceDrunk.txt'):
         with open('daysSinceDrunk.txt', 'w') as file:
-            file.write(str(0))
+            file.write(str(daysSinceDrunk))
     else:
         with open('daysSinceDrunk.txt', 'r') as file:
-            daysSinceDrunk = int(file.read())
+            line = file.readline()
+            daysSinceDrunk = int(line.strip()) if line else 0
     return daysSinceDrunk
+
+def get_europe_countdown():
+    europe_target_date = datetime.date(2026, 1, 26)
+    singapore_tz = datetime.timezone(datetime.timedelta(hours=8))
+    today = datetime.datetime.now(singapore_tz).date()
+    europeCountdown = (europe_target_date - today).days
+    return europeCountdown
 
 async def get_qotd():
     response = sqs.receive_message(
@@ -85,10 +92,11 @@ async def send_scheduled_message(context: CallbackContext):
 
     # Get the quote of the day
     qotd, user   = await get_qotd()
+    europeCountdown = get_europe_countdown()
 
     # Send the message to the channel
     channel_username = '-1002157531667'  
-    message = f"Good Morning Everyone! I am sober for {daysSinceDrunk} days! Cheers to that! 🍻 \n\n{qotd} - {user}"
+    message = f"Good Morning Everyone! I am sober for {daysSinceDrunk} days! Cheers to that! 🍻 \n\n 🥦 T-{europeCountdown} DAYS TO EUROPE 🥳 - GET YO ASS READY FOR BROCOLLI UNIVERISITY 🥦 \n\n{qotd} - {user}"
     await context.bot.send_message(chat_id=channel_username, text=message)
 
     # Update the daysSinceDrunk.txt file
@@ -101,7 +109,7 @@ async def send_scheduled_message(context: CallbackContext):
 # Commands
 async def send_drunk_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     qotd, user   = await get_qotd()
-    message = f"Good Morning Everyone! I am sober for {daysSinceDrunk} days! Cheers to that! 🍻 \n\n Longest streak sober: {longestStreak}\n\n{qotd} - {user}"
+    message = f"Good Morning Everyone! I am sober for {daysSinceDrunk} days! Cheers to that! 🍻 \n\n{qotd} - {user}"
     await context.bot.send_message(chat_id=update.effective_chat.id, text=message)
     
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -172,7 +180,8 @@ async def set(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     global daysSinceDrunk
-    daysSinceDrunk = get_info()
+    global europeCountdown
+    daysSinceDrunk, europeCountdown = get_info()
 
     application = ApplicationBuilder().token(BOT_TOKEN).build()
     
